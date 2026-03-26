@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qizzy - Smart Quiz Experience</title>
+
+<style>
+html { scroll-behavior: smooth; }
+
+:root{
+  --bg: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  --card: rgba(255,255,255,0.08);
+  --text: #fff;
+  --primary:#00f5a0;
+  --danger:#ff4d6d;
+}
+
+body{
+  margin:0;
+  font-family:'Poppins',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow-x:hidden;
+}
+
+/* Floating Animated Background */
+body::before, body::after{
+  content:"";
+  position:fixed;
+  width:400px;
+  height:400px;
+  border-radius:50%;
+  filter:blur(120px);
+  z-index:-1;
+  animation:float 12s infinite alternate ease-in-out;
+}
+
+body::before{
+  background:#00f5a0;
+  top:-100px;
+  left:-100px;
+}
+
+body::after{
+  background:#00d9f5;
+  bottom:-100px;
+  right:-100px;
+}
+
+@keyframes float{
+  from{transform:translateY(0px);}
+  to{transform:translateY(80px);}
+}
+
+/* Glass Card */
+.container{
+  width:95%;
+  max-width:850px;
+  margin:50px auto;
+  padding:40px;
+  background:var(--card);
+  backdrop-filter:blur(25px);
+  border-radius:30px;
+  box-shadow:0 30px 80px rgba(0,0,0,0.5);
+  transition:0.6s;
+  perspective:1000px;
+}
+
+.container:hover{
+  transform:rotateY(5deg) rotateX(5deg);
+}
+
+h1{
+  text-align:center;
+  font-size:2.5rem;
+  background:linear-gradient(90deg,#00f5a0,#00d9f5);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  margin-bottom:10px;
+}
+
+/* Input */
+input[type="text"]{
+  width:100%;
+  padding:15px;
+  border-radius:15px;
+  border:none;
+  margin:15px 0;
+  font-size:16px;
+  outline:none;
+}
+
+/* Buttons with Ripple */
+button{
+  width:100%;
+  padding:15px;
+  border:none;
+  border-radius:30px;
+  font-weight:bold;
+  cursor:pointer;
+  font-size:15px;
+  background:linear-gradient(45deg,#00f5a0,#00d9f5);
+  margin-top:10px;
+  position:relative;
+  overflow:hidden;
+  transition:0.3s;
+}
+
+button:hover{
+  transform:scale(1.05);
+  box-shadow:0 0 25px var(--primary);
+}
+
+button:disabled{
+  opacity:0.5;
+  cursor:not-allowed;
+}
+
+/* Progress */
+.progress{
+  height:10px;
+  background:rgba(255,255,255,0.2);
+  border-radius:20px;
+  overflow:hidden;
+  margin:15px 0;
+}
+
+.progress-bar{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg,#00f5a0,#00d9f5);
+  transition:0.4s ease;
+}
+
+.timer{
+  text-align:right;
+  font-weight:bold;
+  margin-bottom:10px;
+}
+
+/* Question Animation */
+.question-card{
+  animation:fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn{
+  from{opacity:0; transform:translateY(20px);}
+  to{opacity:1; transform:translateY(0);}
+}
+
+/* Options */
+.options label{
+  display:block;
+  padding:15px;
+  margin:10px 0;
+  border-radius:18px;
+  background:rgba(255,255,255,0.1);
+  cursor:pointer;
+  transition:0.3s;
+}
+
+.options label:hover{
+  transform:scale(1.03);
+  background:rgba(0,255,200,0.25);
+}
+
+.options label.selected{
+  border:2px solid var(--primary);
+}
+
+.options label.correct{
+  background:rgba(0,255,100,0.3);
+}
+
+.options label.wrong{
+  background:rgba(255,0,0,0.3);
+}
+
+/* Result */
+#resultScreen{
+  animation:fadeIn 0.8s ease;
+}
+
+canvas{
+  display:block;
+  margin:20px auto;
+}
+
+.leaderboard li{
+  margin:5px 0;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>✨ Qizzy</h1>
+
+<div id="startScreen">
+  <input type="text" id="playerName" placeholder="Enter Your Name">
+  <button onclick="startQuiz()">Start Qizzy</button>
+</div>
+
+<div id="quizScreen" style="display:none;">
+  <div class="progress">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+  <div class="timer">⏳ <span id="time">15</span>s</div>
+  <div id="quiz"></div>
+  <button id="nextBtn" onclick="nextQuestion()" disabled>Next</button>
+</div>
+
+<div id="resultScreen" style="display:none;">
+  <canvas id="chart" width="200" height="200"></canvas>
+  <h2 id="grade"></h2>
+  <button onclick="restartQuiz()">Play Again</button>
+</div>
+
+<h3>🏆 Leaderboard</h3>
+<ul id="leaderboard"></ul>
+
+</div>
+
+<script>
+const questionBank=[
+{q:"What is the chemical symbol for Gold?",o:["Au","Ag","Gd","Go"],a:"Au"},
+{q:"What is the square root of 144?",o:["10","11","12","14"],a:"12"},
+{q:"Which country has the largest population?",o:["USA","India","China","Brazil"],a:"India"},
+{q:"What does CPU stand for?",o:["Central Processing Unit","Computer Personal Unit","Central Program Utility","Core Processing Unit"],a:"Central Processing Unit"},
+{q:"Which gas do plants absorb from the atmosphere?",o:["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],a:"Carbon Dioxide"}
+];
+
+let questions=[],current=0,score=0,timer=15,interval,player="";
+
+function shuffle(arr){
+  let a=[...arr];
+  for(let i=a.length-1;i>0;i--){
+    let j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function startQuiz(){
+  player=document.getElementById("playerName").value.trim();
+  if(!player){alert("Enter your name");return;}
+  questions=shuffle(questionBank);
+  current=0;score=0;
+  document.getElementById("startScreen").style.display="none";
+  document.getElementById("quizScreen").style.display="block";
+  loadQuestion();
+}
+
+function loadQuestion(){
+  let q=questions[current];
+  document.getElementById("quiz").innerHTML=`
+  <div class="question-card">
+    <h3>${q.q}</h3>
+    <div class="options">
+      ${shuffle(q.o).map(opt=>
+        `<label onclick="selectOption(this,'${opt}')">${opt}</label>`
+      ).join("")}
+    </div>
+  </div>`;
+  document.getElementById("progressBar").style.width=(current/questions.length)*100+"%";
+  document.getElementById("nextBtn").disabled=true;
+  startTimer();
+}
+
+function selectOption(label,value){
+  document.querySelectorAll(".options label").forEach(l=>l.classList.remove("selected"));
+  label.classList.add("selected");
+  label.dataset.value=value;
+  document.getElementById("nextBtn").disabled=false;
+}
+
+function startTimer(){
+  timer=15;
+  document.getElementById("time").textContent=timer;
+  clearInterval(interval);
+  interval=setInterval(()=>{
+    timer--;
+    document.getElementById("time").textContent=timer;
+    if(timer<=0) nextQuestion();
+  },1000);
+}
+
+function nextQuestion(){
+  clearInterval(interval);
+  let selected=document.querySelector(".options label.selected");
+  let correct=questions[current].a;
+  if(selected){
+    if(selected.dataset.value===correct){
+      selected.classList.add("correct");
+      score++;
+    }else{
+      selected.classList.add("wrong");
+    }
+  }
+  setTimeout(()=>{
+    current++;
+    if(current<questions.length) loadQuestion();
+    else showResult();
+  },700);
+}
+
+function showResult(){
+  document.getElementById("quizScreen").style.display="none";
+  document.getElementById("resultScreen").style.display="block";
+  drawChart();
+  saveScore();
+  showLeaderboard();
+}
+
+function drawChart(){
+  let canvas=document.getElementById("chart");
+  let ctx=canvas.getContext("2d");
+  ctx.clearRect(0,0,200,200);
+  let percent=score/questions.length;
+  ctx.beginPath();
+  ctx.arc(100,100,80,0,percent*2*Math.PI);
+  ctx.lineWidth=15;
+  ctx.strokeStyle="#00f5a0";
+  ctx.stroke();
+  ctx.font="18px Arial";
+  ctx.fillText(`${score}/${questions.length}`,85,105);
+  document.getElementById("grade").innerText=
+    percent>=0.8?"Excellent 🎉":
+    percent>=0.5?"Good 👍":
+    "Keep Practicing 💪";
+}
+
+function saveScore(){
+  let data=JSON.parse(localStorage.getItem("qizzyBoard"))||[];
+  data.push({name:player,score:score});
+  localStorage.setItem("qizzyBoard",JSON.stringify(data));
+}
+
+function showLeaderboard(){
+  let data=JSON.parse(localStorage.getItem("qizzyBoard"))||[];
+  data.sort((a,b)=>b.score-a.score);
+  document.getElementById("leaderboard").innerHTML=
+    data.slice(0,5).map(d=>`<li>${d.name} - ${d.score}/5</li>`).join("");
+}
+
+function restartQuiz(){
+  document.getElementById("resultScreen").style.display="none";
+  document.getElementById("startScreen").style.display="block";
+}
+
+showLeaderboard();
+</script>
+
+</body>
+</html>
